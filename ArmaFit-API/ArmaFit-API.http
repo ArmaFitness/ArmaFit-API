@@ -1,6 +1,39 @@
 @ArmaFit_API_HostAddress = http://localhost:5087
 
-GET {{ArmaFit_API_HostAddress}}/weatherforecast/
+# Seeded users all have the password Password123!
+POST {{ArmaFit_API_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "jonas@armafit.lt", "password": "Password123!" }
+
+###
+
+GET {{ArmaFit_API_HostAddress}}/api/plans?athleteId=3
+Accept: application/json
+
+###
+
+GET {{ArmaFit_API_HostAddress}}/api/plans/1/workouts/1/exercises
+Accept: application/json
+
+###
+
+POST {{ArmaFit_API_HostAddress}}/api/workout-logs
+Content-Type: application/json
+
+{
+  "userId": 3,
+  "workoutId": 1,
+  "notes": "Felt strong today.",
+  "sets": [
+    { "exerciseId": 1, "setNumber": 1, "weightKg": 67.5, "reps": 8 },
+    { "exerciseId": 1, "setNumber": 2, "weightKg": 67.5, "reps": 7 }
+  ]
+}
+
+###
+
+GET {{ArmaFit_API_HostAddress}}/api/athletes/3/progress?exerciseId=1
 Accept: application/json
 
 ###
