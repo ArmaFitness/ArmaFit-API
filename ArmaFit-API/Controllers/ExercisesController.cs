@@ -9,6 +9,7 @@ namespace ArmaFit_API.Controllers;
 [Route("api/exercises")]
 public class ExercisesController(AppDbContext db) : ControllerBase
 {
+    // pagination optional
     /// <summary>List the exercise catalog (used to pick an exerciseId for a workout).</summary>
     [HttpGet]
     [ProducesResponseType<List<ExerciseDto>>(StatusCodes.Status200OK)]

@@ -9,6 +9,7 @@ namespace ArmaFit_API.Controllers;
 [Route("api/plans")]
 public class PlansController(AppDbContext db) : ControllerBase
 {
+    //pagination here
     /// <summary>List workout plans, optionally filtered by athlete or creator.</summary>
     [HttpGet]
     [ProducesResponseType<List<PlanDto>>(StatusCodes.Status200OK)]

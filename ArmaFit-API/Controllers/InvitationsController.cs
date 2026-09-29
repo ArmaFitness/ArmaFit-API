@@ -9,6 +9,7 @@ namespace ArmaFit_API.Controllers;
 [Route("api/invitations")]
 public class InvitationsController(AppDbContext db) : ControllerBase
 {
+    // pagination here
     /// <summary>List invitations, e.g. a trainer's pending invitations or active athletes.</summary>
     [HttpGet]
     [ProducesResponseType<List<InvitationDto>>(StatusCodes.Status200OK)]
