@@ -9,18 +9,22 @@ namespace ArmaFit_API.Controllers;
 [Route("api/plans")]
 public class PlansController(AppDbContext db) : ControllerBase
 {
-    //pagination here
     /// <summary>List workout plans, optionally filtered by athlete or creator.</summary>
     [HttpGet]
-    [ProducesResponseType<List<PlanDto>>(StatusCodes.Status200OK)]
-    public async Task<List<PlanDto>> GetAll(int? athleteId, int? createdBy)
+    [ProducesResponseType<PagedResult<PlanDto>>(StatusCodes.Status200OK)]
+    public async Task<PagedResult<PlanDto>> GetAll(int? athleteId, int? createdBy, int page = 1, int pageSize = 20)
     {
-        var query = db.WorkoutPlans.AsQueryable();
-        if (athleteId != null) query = query.Where(p => p.AthleteId == athleteId);
-        if (createdBy != null) query = query.Where(p => p.CreatedBy == createdBy);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        page = Math.Max(page, 1);
 
-        var plans = await query.OrderBy(p => p.Id).ToListAsync();
-        return plans.Select(PlanDto.From).ToList();
+        var query = db.WorkoutPlans.AsQueryable();
+        //these will be useful for filtering
+        //if (athleteId != null) query = query.Where(p => p.AthleteId == athleteId);
+        //if (createdBy != null) query = query.Where(p => p.CreatedBy == createdBy);
+
+        var total = await query.CountAsync();
+        var plans = await query.OrderBy(p => p.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+        return new PagedResult<PlanDto>(plans.Select(PlanDto.From).ToList(), page, pageSize, total);
     }
 
     /// <summary>Get one workout plan.</summary>

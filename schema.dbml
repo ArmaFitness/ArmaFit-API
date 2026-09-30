@@ -1,31 +1,35 @@
+// Mirrors the live PostgreSQL database (created by EF Core EnsureCreated).
+// Defaults (role, is_active, timestamps, status, activity_level) are set in the
+// application, not in the database. All foreign keys are ON DELETE CASCADE.
+
 //////////////////////////////////////
 // Enums
 //////////////////////////////////////
 
 Enum user_role {
-  trainer
   athlete
+  trainer
 }
 
 Enum biological_sex {
-  male
   female
+  male
   other
 }
 
 Enum activity_level {
-  sedentary
+  extremely_active
   lightly_active
   moderately_active
+  sedentary
   very_active
-  extremely_active
 }
 
 Enum invitation_status {
-  pending   // athlete sent the invitation, trainer has not answered
   active    // trainer accepted
   declined  // trainer rejected
   ended     // relationship terminated later
+  pending   // athlete sent the invitation, trainer has not answered
 }
 
 //////////////////////////////////////
@@ -34,31 +38,32 @@ Enum invitation_status {
 
 Table users {
   id integer [pk, increment]
-  email varchar [unique, not null]
-  password_hash varchar [not null]
-  full_name varchar [not null]
-  role user_role [not null, default: 'athlete']
-  is_active boolean [not null, default: true]
-  created_at timestamp [not null, default: `now()`]
+  email text [unique, not null]
+  password_hash text [not null]
+  full_name text [not null]
+  role user_role [not null]
+  is_active boolean [not null]
+  created_at timestamptz [not null]
 
   // profile data (nullable: mostly relevant for athletes)
   date_of_birth date
   sex biological_sex
   height_cm decimal(5,2)
-  activity_level activity_level [default: 'moderately_active']
+  activity_level activity_level
 }
 
 Table trainer_athletes {
   id integer [pk, increment]
   trainer_id integer [not null, ref: > users.id]
   athlete_id integer [not null, ref: > users.id]
-  status invitation_status [not null, default: 'pending']
-  invited_at timestamp [not null, default: `now()`]
-  responded_at timestamp
-  ended_at timestamp
+  status invitation_status [not null]
+  invited_at timestamptz [not null]
+  responded_at timestamptz
+  ended_at timestamptz
 
   indexes {
     (trainer_id, athlete_id) [unique]
+    athlete_id
   }
 }
 
@@ -69,24 +74,29 @@ Table trainer_athletes {
 // Catalog of exercises (one row per exercise, reused everywhere)
 Table exercises {
   id integer [pk, increment]
-  name varchar [not null]
-  description varchar
+  name text [not null]
+  description text
 }
 
 Table workout_plans {
   id integer [pk, increment]
-  name varchar [not null]
-  description varchar
+  name text [not null]
+  description text
   created_by integer [not null, ref: > users.id]   // athlete or trainer
   athlete_id integer [not null, ref: > users.id]   // who the plan is for
-  created_at timestamp [not null, default: `now()`]
-  updated_at timestamp [not null, default: `now()`]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    athlete_id
+    created_by
+  }
 }
 
 Table workouts {
   id integer [pk, increment]
   workout_plan_id integer [not null, ref: > workout_plans.id]
-  name varchar [not null]
+  name text [not null]
   day_number integer [not null]
 
   indexes {
@@ -100,12 +110,13 @@ Table workout_exercises {
   workout_id integer [not null, ref: > workouts.id]
   exercise_id integer [not null, ref: > exercises.id]
   sets integer [not null]
-  reps integer          // optional target
+  reps integer           // optional target
   weight_kg decimal(6,2) // optional target
   order_index integer
 
   indexes {
     (workout_id, order_index)
+    exercise_id
   }
 }
 
@@ -117,8 +128,13 @@ Table workout_logs {
   id integer [pk, increment]
   user_id integer [not null, ref: > users.id]
   workout_id integer [not null, ref: > workouts.id] // plan is reachable via workouts
-  logged_at timestamp [not null, default: `now()`]
-  notes varchar
+  logged_at timestamptz [not null]
+  notes text
+
+  indexes {
+    user_id
+    workout_id
+  }
 }
 
 Table workout_log_sets {
@@ -131,5 +147,6 @@ Table workout_log_sets {
 
   indexes {
     (workout_log_id, exercise_id, set_number) [unique]
+    exercise_id
   }
 }

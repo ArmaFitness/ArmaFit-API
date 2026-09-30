@@ -9,19 +9,23 @@ namespace ArmaFit_API.Controllers;
 [Route("api/invitations")]
 public class InvitationsController(AppDbContext db) : ControllerBase
 {
-    // pagination here
     /// <summary>List invitations, e.g. a trainer's pending invitations or active athletes.</summary>
     [HttpGet]
-    [ProducesResponseType<List<InvitationDto>>(StatusCodes.Status200OK)]
-    public async Task<List<InvitationDto>> GetAll(int? trainerId, int? athleteId, InvitationStatus? status)
+    [ProducesResponseType<PagedResult<InvitationDto>>(StatusCodes.Status200OK)]
+    public async Task<PagedResult<InvitationDto>> GetAll(int? trainerId, int? athleteId, InvitationStatus? status, int page = 1, int pageSize = 20)
     {
-        IQueryable<TrainerAthlete> query = db.TrainerAthletes.Include(t => t.Trainer).Include(t => t.Athlete);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        page = Math.Max(page, 1);
+
+
+        IQueryable<TrainerAthlete> query = db.TrainerAthletes.AsNoTracking().Include(t => t.Trainer).Include(t => t.Athlete);
         if (trainerId != null) query = query.Where(t => t.TrainerId == trainerId);
         if (athleteId != null) query = query.Where(t => t.AthleteId == athleteId);
         if (status != null) query = query.Where(t => t.Status == status);
 
-        var invitations = await query.OrderByDescending(t => t.InvitedAt).ToListAsync();
-        return invitations.Select(InvitationDto.From).ToList();
+        var total = await query.CountAsync();
+        var invitations = await query.OrderByDescending(t => t.InvitedAt).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+        return new PagedResult<InvitationDto>(invitations.Select(InvitationDto.From).ToList(), page, pageSize, total);
     }
 
     /// <summary>Athlete sends an invitation to a trainer (found by email).</summary>
