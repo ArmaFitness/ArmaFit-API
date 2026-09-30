@@ -1,5 +1,6 @@
 using ArmaFit_API.Data;
 using ArmaFit_API.Models;
+using ArmaFit_API.Models.Queries;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,15 +13,14 @@ public class PlansController(AppDbContext db) : ControllerBase
     /// <summary>List workout plans, optionally filtered by athlete or creator.</summary>
     [HttpGet]
     [ProducesResponseType<PagedResult<PlanDto>>(StatusCodes.Status200OK)]
-    public async Task<PagedResult<PlanDto>> GetAll(int? athleteId, int? createdBy, int page = 1, int pageSize = 20)
+    public async Task<PagedResult<PlanDto>> GetAll([FromQuery] PlanSearchQuery q)
     {
-        pageSize = Math.Clamp(pageSize, 1, 100);
-        page = Math.Max(page, 1);
+        var pageSize = Math.Clamp(q.PageSize, 1, 100);
+        var page = Math.Max(q.Page, 1);
 
         var query = db.WorkoutPlans.AsQueryable();
-        //these will be useful for filtering
-        //if (athleteId != null) query = query.Where(p => p.AthleteId == athleteId);
-        //if (createdBy != null) query = query.Where(p => p.CreatedBy == createdBy);
+        if (q.AthleteId != null) query = query.Where(p => p.AthleteId == q.AthleteId);
+        if (q.CreatedBy != null) query = query.Where(p => p.CreatedBy == q.CreatedBy);
 
         var total = await query.CountAsync();
         var plans = await query.OrderBy(p => p.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
