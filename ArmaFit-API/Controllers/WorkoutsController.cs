@@ -20,7 +20,7 @@ public class WorkoutsController(AppDbContext db) : ControllerBase
 
         var workouts = await db.Workouts.Where(w => w.WorkoutPlanId == planId)
             .OrderBy(w => w.DayNumber).ThenBy(w => w.Id).ToListAsync();
-        return workouts.Select(WorkoutDto.From).ToList();
+        return workouts.Select(w => WithLinks(WorkoutDto.From(w))).ToList();
     }
 
     /// <summary>Get one workout of a plan.</summary>
@@ -32,7 +32,7 @@ public class WorkoutsController(AppDbContext db) : ControllerBase
         var workout = await Find(planId, workoutId);
         if (workout == null) return WorkoutNotFound(planId, workoutId);
 
-        return WorkoutDto.From(workout);
+        return WithLinks(WorkoutDto.From(workout));
     }
 
     /// <summary>Create a workout in a plan and assign it a day.</summary>
@@ -49,7 +49,7 @@ public class WorkoutsController(AppDbContext db) : ControllerBase
         db.Workouts.Add(workout);
         await db.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(Get), new { planId, workoutId = workout.Id }, WorkoutDto.From(workout));
+        return CreatedAtAction(nameof(Get), new { planId, workoutId = workout.Id }, WithLinks(WorkoutDto.From(workout)));
     }
 
     /// <summary>Update a workout's name and day.</summary>
@@ -66,7 +66,7 @@ public class WorkoutsController(AppDbContext db) : ControllerBase
         workout.DayNumber = req.DayNumber;
         await db.SaveChangesAsync();
 
-        return WorkoutDto.From(workout);
+        return WithLinks(WorkoutDto.From(workout));
     }
 
     /// <summary>Delete a workout together with its exercises and logs.</summary>
@@ -83,6 +83,18 @@ public class WorkoutsController(AppDbContext db) : ControllerBase
 
         return NoContent();
     }
+
+    private WorkoutDto WithLinks(WorkoutDto w) => w with
+    {
+        Links = new()
+        {
+            ["self"] = this.Link(nameof(Get), "Workouts", new { planId = w.WorkoutPlanId, workoutId = w.Id }),
+            ["update"] = this.Link(nameof(Update), "Workouts", new { planId = w.WorkoutPlanId, workoutId = w.Id }, "PUT"),
+            ["delete"] = this.Link(nameof(Delete), "Workouts", new { planId = w.WorkoutPlanId, workoutId = w.Id }, "DELETE"),
+            ["plan"] = this.Link("Get", "Plans", new { id = w.WorkoutPlanId }),
+            ["exercises"] = this.Link("GetAll", "WorkoutExercises", new { planId = w.WorkoutPlanId, workoutId = w.Id }),
+        }
+    };
 
     private Task<Workout?> Find(int planId, int workoutId) =>
         db.Workouts.FirstOrDefaultAsync(w => w.Id == workoutId && w.WorkoutPlanId == planId);

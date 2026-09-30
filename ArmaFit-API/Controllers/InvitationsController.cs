@@ -25,7 +25,8 @@ public class InvitationsController(AppDbContext db) : ControllerBase
 
         var total = await query.CountAsync();
         var invitations = await query.OrderByDescending(t => t.InvitedAt).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
-        return new PagedResult<InvitationDto>(invitations.Select(InvitationDto.From).ToList(), page, pageSize, total);
+        var result = new PagedResult<InvitationDto>(invitations.Select(i => WithLinks(InvitationDto.From(i))).ToList(), page, pageSize, total);
+        return result with { Links = this.PageLinks(page, result.TotalPages) };
     }
 
     /// <summary>Athlete sends an invitation to a trainer (found by email).</summary>
@@ -61,7 +62,7 @@ public class InvitationsController(AppDbContext db) : ControllerBase
         invitation.EndedAt = null;
         await db.SaveChangesAsync();
 
-        return StatusCode(StatusCodes.Status201Created, InvitationDto.From(invitation));
+        return StatusCode(StatusCodes.Status201Created, WithLinks(InvitationDto.From(invitation)));
     }
 
     /// <summary>Trainer accepts a pending invitation.</summary>
@@ -81,6 +82,18 @@ public class InvitationsController(AppDbContext db) : ControllerBase
         invitation.RespondedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
 
-        return InvitationDto.From(invitation);
+        return WithLinks(InvitationDto.From(invitation));
     }
+
+    // "accept" is only offered while the invitation is pending.
+    private InvitationDto WithLinks(InvitationDto i)
+    {
+        var links = new Dictionary<string, Link> { ["athlete-plans"] = PlansFor(i.AthleteId) };
+        if (i.Status == InvitationStatus.Pending)
+            links["accept"] = this.Link(nameof(Accept), "Invitations", new { id = i.Id }, "POST");
+        return i with { Links = links };
+    }
+
+    private Link PlansFor(int athleteId) =>
+        new(Url.Action("GetAll", "Plans", new { athleteId })!, "GET");
 }

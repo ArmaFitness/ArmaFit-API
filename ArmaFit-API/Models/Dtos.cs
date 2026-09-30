@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using ArmaFit_API.Data;
 
 namespace ArmaFit_API.Models;
@@ -33,6 +34,9 @@ public record InvitationDto(
     int Id, int TrainerId, string TrainerName, int AthleteId, string AthleteName,
     InvitationStatus Status, DateTime InvitedAt, DateTime? RespondedAt)
 {
+    [JsonPropertyName("_links")]
+    public Dictionary<string, Link>? Links { get; init; }
+
     public static InvitationDto From(TrainerAthlete t) =>
         new(t.Id, t.TrainerId, t.Trainer!.FullName, t.AthleteId, t.Athlete!.FullName, t.Status, t.InvitedAt, t.RespondedAt);
 }
@@ -53,6 +57,9 @@ public record PlanUpdateRequest([Required, MaxLength(100)] string Name, [MaxLeng
 
 public record PlanDto(int Id, string Name, string? Description, int CreatedBy, int AthleteId, DateTime CreatedAt, DateTime UpdatedAt)
 {
+    [JsonPropertyName("_links")]
+    public Dictionary<string, Link>? Links { get; init; }
+
     public static PlanDto From(WorkoutPlan p) =>
         new(p.Id, p.Name, p.Description, p.CreatedBy, p.AthleteId, p.CreatedAt, p.UpdatedAt);
 }
@@ -65,6 +72,9 @@ public record WorkoutRequest([Required, MaxLength(100)] string Name, [Range(1, 7
 
 public record WorkoutDto(int Id, int WorkoutPlanId, string Name, int DayNumber)
 {
+    [JsonPropertyName("_links")]
+    public Dictionary<string, Link>? Links { get; init; }
+
     public static WorkoutDto From(Workout w) => new(w.Id, w.WorkoutPlanId, w.Name, w.DayNumber);
 }
 
@@ -80,6 +90,9 @@ public record WorkoutExerciseRequest(
 public record WorkoutExerciseDto(
     int Id, int WorkoutId, int ExerciseId, string ExerciseName, int Sets, int? Reps, decimal? WeightKg, int? OrderIndex)
 {
+    [JsonPropertyName("_links")]
+    public Dictionary<string, Link>? Links { get; init; }
+
     public static WorkoutExerciseDto From(WorkoutExercise e) =>
         new(e.Id, e.WorkoutId, e.ExerciseId, e.Exercise!.Name, e.Sets, e.Reps, e.WeightKg, e.OrderIndex);
 }

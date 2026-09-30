@@ -24,7 +24,8 @@ public class PlansController(AppDbContext db) : ControllerBase
 
         var total = await query.CountAsync();
         var plans = await query.OrderBy(p => p.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
-        return new PagedResult<PlanDto>(plans.Select(PlanDto.From).ToList(), page, pageSize, total);
+        var result = new PagedResult<PlanDto>(plans.Select(p => WithLinks(PlanDto.From(p))).ToList(), page, pageSize, total);
+        return result with { Links = this.PageLinks(page, result.TotalPages) };
     }
 
     /// <summary>Get one workout plan.</summary>
@@ -36,7 +37,7 @@ public class PlansController(AppDbContext db) : ControllerBase
         var plan = await db.WorkoutPlans.FindAsync(id);
         if (plan == null) return PlanNotFound(id);
 
-        return PlanDto.From(plan);
+        return WithLinks(PlanDto.From(plan));
     }
 
     /// <summary>Create a plan. An athlete creates one for themselves; a trainer for one of their active athletes.</summary>
@@ -65,7 +66,7 @@ public class PlansController(AppDbContext db) : ControllerBase
         db.WorkoutPlans.Add(plan);
         await db.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(Get), new { id = plan.Id }, PlanDto.From(plan));
+        return CreatedAtAction(nameof(Get), new { id = plan.Id }, WithLinks(PlanDto.From(plan)));
     }
 
     /// <summary>Update a plan's name and description.</summary>
@@ -83,7 +84,7 @@ public class PlansController(AppDbContext db) : ControllerBase
         plan.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
 
-        return PlanDto.From(plan);
+        return WithLinks(PlanDto.From(plan));
     }
 
     /// <summary>Delete a plan together with its workouts, their exercises and logs.</summary>
@@ -100,6 +101,18 @@ public class PlansController(AppDbContext db) : ControllerBase
 
         return NoContent();
     }
+
+    private PlanDto WithLinks(PlanDto p) => p with
+    {
+        Links = new()
+        {
+            ["self"] = this.Link(nameof(Get), "Plans", new { id = p.Id }),
+            ["update"] = this.Link(nameof(Update), "Plans", new { id = p.Id }, "PUT"),
+            ["delete"] = this.Link(nameof(Delete), "Plans", new { id = p.Id }, "DELETE"),
+            ["workouts"] = this.Link("GetAll", "Workouts", new { planId = p.Id }),
+            ["progress"] = this.Link("Get", "Progress", new { athleteId = p.AthleteId }),
+        }
+    };
 
     private ObjectResult PlanNotFound(int id) =>
         Problem($"Plan {id} not found.", statusCode: StatusCodes.Status404NotFound);
