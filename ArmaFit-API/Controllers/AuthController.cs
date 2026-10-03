@@ -20,6 +20,12 @@ public class AuthController(AppDbContext db) : ControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<UserDto>> Register(RegisterRequest req)
     {
+        if (req.DateOfBirth > DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            ModelState.AddModelError(nameof(req.DateOfBirth), "Date of birth cannot be in the future.");
+            return ValidationProblem();
+        }
+
         var email = req.Email.Trim().ToLowerInvariant();
         if (await db.Users.AnyAsync(u => u.Email == email))
             return Problem($"Email '{email}' is already registered.", statusCode: StatusCodes.Status409Conflict);

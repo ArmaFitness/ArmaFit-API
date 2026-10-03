@@ -18,7 +18,7 @@ builder.Services.AddDbContext<AppDbContext>(options => options
 // Enums as snake_case strings (same labels as in the database), numbers as plain JSON numbers.
 void ConfigureJson(JsonSerializerOptions json)
 {
-    json.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower));
+    json.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false));
     json.NumberHandling = JsonNumberHandling.Strict;
 }
 builder.Services.AddControllers().AddJsonOptions(o => ConfigureJson(o.JsonSerializerOptions));

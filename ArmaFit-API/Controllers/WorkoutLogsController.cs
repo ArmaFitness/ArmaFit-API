@@ -16,6 +16,12 @@ public class WorkoutLogsController(AppDbContext db) : ControllerBase
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<WorkoutLogDto>> Create(WorkoutLogCreateRequest req)
     {
+        if (req.Sets.Any(s => s is null))
+        {
+            ModelState.AddModelError(nameof(req.Sets), "Sets must not contain null entries.");
+            return ValidationProblem();
+        }
+
         var workout = await db.Workouts.Include(w => w.WorkoutPlan).Include(w => w.Exercises)
             .FirstOrDefaultAsync(w => w.Id == req.WorkoutId);
         if (workout == null)
