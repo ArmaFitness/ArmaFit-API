@@ -7,6 +7,9 @@ namespace ArmaFit_API.Controllers;
 
 [ApiController]
 [Route("api/plans/{planId:int}/workouts")]
+[PlanAccess]
+[ProducesResponseType(StatusCodes.Status401Unauthorized)]
+[ProducesResponseType(StatusCodes.Status403Forbidden)]
 public class WorkoutsController(AppDbContext db) : ControllerBase
 {
     /// <summary>List the workouts of a plan, ordered by day.</summary>
@@ -15,9 +18,6 @@ public class WorkoutsController(AppDbContext db) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<List<WorkoutDto>>> GetAll(int planId)
     {
-        if (!await db.WorkoutPlans.AnyAsync(p => p.Id == planId))
-            return Problem($"Plan {planId} not found.", statusCode: StatusCodes.Status404NotFound);
-
         var workouts = await db.Workouts.Where(w => w.WorkoutPlanId == planId)
             .OrderBy(w => w.DayNumber).ThenBy(w => w.Id).ToListAsync();
         return workouts.Select(w => WithLinks(WorkoutDto.From(w))).ToList();
@@ -42,9 +42,6 @@ public class WorkoutsController(AppDbContext db) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<WorkoutDto>> Create(int planId, WorkoutRequest req)
     {
-        if (!await db.WorkoutPlans.AnyAsync(p => p.Id == planId))
-            return Problem($"Plan {planId} not found.", statusCode: StatusCodes.Status404NotFound);
-
         var workout = new Workout { WorkoutPlanId = planId, Name = req.Name, DayNumber = req.DayNumber };
         db.Workouts.Add(workout);
         await db.SaveChangesAsync();

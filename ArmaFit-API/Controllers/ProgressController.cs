@@ -7,9 +7,11 @@ namespace ArmaFit_API.Controllers;
 
 [ApiController]
 [Route("api/athletes/{athleteId:int}/progress")]
+[ProducesResponseType(StatusCodes.Status401Unauthorized)]
+[ProducesResponseType(StatusCodes.Status403Forbidden)]
 public class ProgressController(AppDbContext db) : ControllerBase
 {
-    /// <summary>Progress chart data: one point per logged session for each exercise.</summary>
+    /// <summary>Progress chart data: one point per logged session for each exercise. Open to the athlete and their active trainers.</summary>
     [HttpGet]
     [ProducesResponseType<List<ProgressDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -17,6 +19,7 @@ public class ProgressController(AppDbContext db) : ControllerBase
     {
         if (!await db.Users.AnyAsync(u => u.Id == athleteId && u.Role == UserRole.Athlete))
             return Problem($"Athlete {athleteId} not found.", statusCode: StatusCodes.Status404NotFound);
+        if (!await db.CanAccessAthlete(User, athleteId)) return this.Forbidden();
 
         var sets = await db.WorkoutLogSets
             .Where(s => s.WorkoutLog!.UserId == athleteId && (exerciseId == null || s.ExerciseId == exerciseId))

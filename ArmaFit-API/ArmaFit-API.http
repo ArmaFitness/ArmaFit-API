@@ -1,6 +1,8 @@
 @ArmaFit_API_HostAddress = http://localhost:5087
 
 # Seeded users all have the password Password123!
+# Run "login" first: the requests below take their tokens from its response.
+# @name login
 POST {{ArmaFit_API_HostAddress}}/api/auth/login
 Content-Type: application/json
 
@@ -8,21 +10,27 @@ Content-Type: application/json
 
 ###
 
-GET {{ArmaFit_API_HostAddress}}/api/plans?athleteId=3
+@accessToken = {{login.response.body.$.accessToken}}
+@refreshToken = {{login.response.body.$.refreshToken}}
+
+GET {{ArmaFit_API_HostAddress}}/api/plans
 Accept: application/json
+Authorization: Bearer {{accessToken}}
 
 ###
 
 GET {{ArmaFit_API_HostAddress}}/api/plans/1/workouts/1/exercises
 Accept: application/json
+Authorization: Bearer {{accessToken}}
 
 ###
 
+# The athlete is the logged-in user.
 POST {{ArmaFit_API_HostAddress}}/api/workout-logs
 Content-Type: application/json
+Authorization: Bearer {{accessToken}}
 
 {
-  "userId": 3,
   "workoutId": 1,
   "notes": "Felt strong today.",
   "sets": [
@@ -33,7 +41,31 @@ Content-Type: application/json
 
 ###
 
+# Own logs for an athlete; a trainer sees the logs of their active athletes.
+GET {{ArmaFit_API_HostAddress}}/api/workout-logs?athleteId=3
+Accept: application/json
+Authorization: Bearer {{accessToken}}
+
+###
+
 GET {{ArmaFit_API_HostAddress}}/api/athletes/3/progress?exerciseId=1
 Accept: application/json
+Authorization: Bearer {{accessToken}}
+
+###
+
+# New access token + new refresh token; the refresh token sent here stops working.
+POST {{ArmaFit_API_HostAddress}}/api/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{refreshToken}}" }
+
+###
+
+# Ends the session: its access token and refresh token are rejected from now on.
+POST {{ArmaFit_API_HostAddress}}/api/auth/logout
+Content-Type: application/json
+
+{ "refreshToken": "{{refreshToken}}" }
 
 ###

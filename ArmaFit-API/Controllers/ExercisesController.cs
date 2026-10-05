@@ -7,6 +7,7 @@ namespace ArmaFit_API.Controllers;
 
 [ApiController]
 [Route("api/exercises")]
+[ProducesResponseType(StatusCodes.Status401Unauthorized)]
 public class ExercisesController(AppDbContext db) : ControllerBase
 {
     /// <summary>List the exercise catalog (used to pick an exerciseId for a workout).</summary>

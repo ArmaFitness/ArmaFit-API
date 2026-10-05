@@ -18,6 +18,13 @@ public record RegisterRequest(
 
 public record LoginRequest([Required] string Email, [Required] string Password);
 
+public record RefreshRequest([Required] string RefreshToken);
+
+/// <param name="AccessToken">JWT for the Authorization: Bearer header. Carries the user's id (sub) and role.</param>
+/// <param name="RefreshToken">Exchanged at auth/refresh for a new pair; each one works only once.</param>
+/// <param name="User">The logged-in user.</param>
+public record AuthResponse(string AccessToken, string RefreshToken, UserDto User);
+
 public record UserDto(
     int Id, string Email, string FullName, UserRole Role,
     DateOnly? DateOfBirth, BiologicalSex? Sex, decimal? HeightCm, ActivityLevel? ActivityLevel, DateTime CreatedAt)
@@ -28,7 +35,7 @@ public record UserDto(
 
 // ---------- Invitations ----------
 
-public record InvitationCreateRequest([Range(1, int.MaxValue)] int AthleteId, [Required, EmailAddress] string TrainerEmail);
+public record InvitationCreateRequest([Required, EmailAddress] string TrainerEmail);
 
 public record InvitationDto(
     int Id, int TrainerId, string TrainerName, int AthleteId, string AthleteName,
@@ -50,7 +57,6 @@ public record ExerciseDto(int Id, string Name, string? Description);
 public record PlanCreateRequest(
     [Required, MaxLength(100)] string Name,
     [MaxLength(1000)] string? Description,
-    [Range(1, int.MaxValue)] int CreatedBy,
     [Range(1, int.MaxValue)] int AthleteId);
 
 public record PlanUpdateRequest([Required, MaxLength(100)] string Name, [MaxLength(1000)] string? Description);
@@ -106,7 +112,6 @@ public record LogSetRequest(
     [Range(1, 200)] int Reps);
 
 public record WorkoutLogCreateRequest(
-    [Range(1, int.MaxValue)] int UserId,
     [Range(1, int.MaxValue)] int WorkoutId,
     [MaxLength(1000)] string? Notes,
     [Required, MinLength(1)] List<LogSetRequest> Sets);

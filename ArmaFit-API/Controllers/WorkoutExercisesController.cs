@@ -7,6 +7,9 @@ namespace ArmaFit_API.Controllers;
 
 [ApiController]
 [Route("api/plans/{planId:int}/workouts/{workoutId:int}/exercises")]
+[PlanAccess]
+[ProducesResponseType(StatusCodes.Status401Unauthorized)]
+[ProducesResponseType(StatusCodes.Status403Forbidden)]
 public class WorkoutExercisesController(AppDbContext db) : ControllerBase
 {
     /// <summary>List the exercises of a workout, in order.</summary>

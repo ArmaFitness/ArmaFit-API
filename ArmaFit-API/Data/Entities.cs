@@ -28,6 +28,18 @@ public class User
     public ActivityLevel? ActivityLevel { get; set; } = Data.ActivityLevel.ModeratelyActive;
 }
 
+// One row per login. The access token carries the session id, so revoking the row invalidates both tokens.
+[Index(nameof(RefreshTokenHash), IsUnique = true)]
+public class Session
+{
+    public Guid Id { get; set; }
+    public int UserId { get; set; }
+    public User? User { get; set; }
+    public string RefreshTokenHash { get; set; } = "";
+    public DateTime ExpiresAt { get; set; }
+    public DateTime? RevokedAt { get; set; }
+}
+
 [Index(nameof(TrainerId), nameof(AthleteId), IsUnique = true)]
 public class TrainerAthlete
 {

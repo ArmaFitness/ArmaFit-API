@@ -8,9 +8,10 @@ namespace ArmaFit_API.Controllers;
 
 [ApiController]
 [Route("api/plans")]
+[ProducesResponseType(StatusCodes.Status401Unauthorized)]
 public class PlansController(AppDbContext db) : ControllerBase
 {
-    /// <summary>List workout plans, optionally filtered by athlete or creator.</summary>
+    /// <summary>List the workout plans you can access (your own, or those of your active athletes), optionally filtered by athlete or creator.</summary>
     [HttpGet]
     [ProducesResponseType<PagedResult<PlanDto>>(StatusCodes.Status200OK)]
     public async Task<PagedResult<PlanDto>> GetAll([FromQuery] PlanSearchQuery q)
@@ -18,7 +19,8 @@ public class PlansController(AppDbContext db) : ControllerBase
         var pageSize = Math.Clamp(q.PageSize, 1, 100);
         var page = Math.Max(q.Page, 1);
 
-        var query = db.WorkoutPlans.AsQueryable();
+        var athletes = db.AccessibleAthleteIds(User);
+        var query = db.WorkoutPlans.Where(p => athletes.Contains(p.AthleteId));
         if (q.AthleteId != null) query = query.Where(p => p.AthleteId == q.AthleteId);
         if (q.CreatedBy != null) query = query.Where(p => p.CreatedBy == q.CreatedBy);
 
@@ -31,11 +33,13 @@ public class PlansController(AppDbContext db) : ControllerBase
     /// <summary>Get one workout plan.</summary>
     [HttpGet("{id:int}")]
     [ProducesResponseType<PlanDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PlanDto>> Get(int id)
     {
         var plan = await db.WorkoutPlans.FindAsync(id);
         if (plan == null) return PlanNotFound(id);
+        if (!await db.CanAccessAthlete(User, plan.AthleteId)) return this.Forbidden();
 
         return WithLinks(PlanDto.From(plan));
     }
@@ -44,25 +48,18 @@ public class PlansController(AppDbContext db) : ControllerBase
     [HttpPost]
     [ProducesResponseType<PlanDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<PlanDto>> Create(PlanCreateRequest req)
     {
-        var creator = await db.Users.FindAsync(req.CreatedBy);
-        if (creator == null)
-            return Problem($"User {req.CreatedBy} does not exist.", statusCode: StatusCodes.Status422UnprocessableEntity);
-
         var athlete = await db.Users.FindAsync(req.AthleteId);
         if (athlete == null || athlete.Role != UserRole.Athlete)
             return Problem($"Athlete {req.AthleteId} does not exist.", statusCode: StatusCodes.Status422UnprocessableEntity);
 
-        if (creator.Role == UserRole.Athlete && creator.Id != athlete.Id)
-            return Problem("Athletes can only create plans for themselves.", statusCode: StatusCodes.Status422UnprocessableEntity);
+        if (!await db.CanAccessAthlete(User, athlete.Id))
+            return this.Forbidden("You can only create plans for yourself or for your active athletes.");
 
-        if (creator.Role == UserRole.Trainer && !await db.TrainerAthletes.AnyAsync(t =>
-                t.TrainerId == creator.Id && t.AthleteId == athlete.Id && t.Status == InvitationStatus.Active))
-            return Problem("Trainer has no active link with this athlete.", statusCode: StatusCodes.Status422UnprocessableEntity);
-
-        var plan = new WorkoutPlan { Name = req.Name, Description = req.Description, CreatedBy = creator.Id, AthleteId = athlete.Id };
+        var plan = new WorkoutPlan { Name = req.Name, Description = req.Description, CreatedBy = User.UserId(), AthleteId = athlete.Id };
         db.WorkoutPlans.Add(plan);
         await db.SaveChangesAsync();
 
@@ -73,11 +70,13 @@ public class PlansController(AppDbContext db) : ControllerBase
     [HttpPut("{id:int}")]
     [ProducesResponseType<PlanDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<PlanDto>> Update(int id, PlanUpdateRequest req)
     {
         var plan = await db.WorkoutPlans.FindAsync(id);
         if (plan == null) return PlanNotFound(id);
+        if (!await db.CanAccessAthlete(User, plan.AthleteId)) return this.Forbidden();
 
         plan.Name = req.Name;
         plan.Description = req.Description;
@@ -90,11 +89,13 @@ public class PlansController(AppDbContext db) : ControllerBase
     /// <summary>Delete a plan together with its workouts, their exercises and logs.</summary>
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(int id)
     {
         var plan = await db.WorkoutPlans.FindAsync(id);
         if (plan == null) return PlanNotFound(id);
+        if (!await db.CanAccessAthlete(User, plan.AthleteId)) return this.Forbidden();
 
         db.WorkoutPlans.Remove(plan);
         await db.SaveChangesAsync();

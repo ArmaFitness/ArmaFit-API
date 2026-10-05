@@ -1,7 +1,14 @@
+using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ArmaFit_API.Controllers;
 using ArmaFit_API.Data;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +21,41 @@ builder.Services.AddDbContext<AppDbContext>(options => options
         .MapEnum<ActivityLevel>("activity_level")
         .MapEnum<InvitationStatus>("invitation_status"))
     .UseSnakeCaseNamingConvention());
+
+// Access tokens are JWTs signed with Jwt:Key (HS256 needs at least 32 bytes). Set Jwt__Key outside development.
+var jwtKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
+    builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is not configured.")));
+if (jwtKey.KeySize < 256) throw new InvalidOperationException("Jwt:Key must be at least 32 bytes long.");
+builder.Services.AddSingleton(new SigningCredentials(jwtKey, SecurityAlgorithms.HmacSha256));
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(o =>
+{
+    o.MapInboundClaims = false; // keep the short claim names from the token: sub, role, sid
+    o.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidIssuer = AuthController.Issuer,
+        ValidAudience = AuthController.Issuer,
+        IssuerSigningKey = jwtKey,
+        NameClaimType = "sub",
+        RoleClaimType = "role",
+    };
+    o.Events = new JwtBearerEvents
+    {
+        // Logging out revokes the session, which makes its access token invalid at once instead of when it expires.
+        // ponytail: one primary-key lookup per request, cache it if it ever shows up in profiling.
+        OnTokenValidated = async context =>
+        {
+            var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+            if (!Guid.TryParse(context.Principal!.FindFirstValue("sid"), out var sessionId) ||
+                !await db.Sessions.AnyAsync(s => s.Id == sessionId && s.RevokedAt == null && s.User!.IsActive))
+                context.Fail("The session is no longer valid.");
+        },
+    };
+});
+
+// Every endpoint requires a logged-in user unless it is marked [AllowAnonymous].
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 
 // Enums as snake_case strings (same labels as in the database), numbers as plain JSON numbers.
 void ConfigureJson(JsonSerializerOptions json)
@@ -39,6 +81,15 @@ builder.Services.AddOpenApi(options => options.AddOperationTransformer((operatio
         content[status.StartsWith('2') ? "application/json" : "application/problem+json"] = media;
     }
     return Task.CompletedTask;
+}).AddDocumentTransformer((document, _, _) =>
+{
+    // Bearer scheme, so Swagger UI gets an "Authorize" button and sends the access token.
+    document.Components ??= new();
+    document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+    document.Components.SecuritySchemes["Bearer"] =
+        new OpenApiSecurityScheme { Type = SecuritySchemeType.Http, Scheme = "bearer", BearerFormat = "JWT" };
+    document.Security = [new OpenApiSecurityRequirement { [new OpenApiSecuritySchemeReference("Bearer", document)] = [] }];
+    return Task.CompletedTask;
 }));
 
 var app = builder.Build();
@@ -55,11 +106,12 @@ using (var scope = app.Services.CreateScope())
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
-app.MapOpenApi();
+app.MapOpenApi().AllowAnonymous();
 app.UseSwaggerUI(o => o.SwaggerEndpoint("/openapi/v1.json", "ArmaFit API"));
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

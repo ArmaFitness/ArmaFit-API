@@ -52,6 +52,20 @@ Table users {
   activity_level activity_level
 }
 
+// One row per login. The access token (JWT) carries the session id, so setting
+// revoked_at on logout invalidates both the access and the refresh token.
+Table sessions {
+  id uuid [pk]
+  user_id integer [not null, ref: > users.id]
+  refresh_token_hash text [unique, not null] // SHA-256 of the current refresh token
+  expires_at timestamptz [not null]
+  revoked_at timestamptz
+
+  indexes {
+    user_id
+  }
+}
+
 Table trainer_athletes {
   id integer [pk, increment]
   trainer_id integer [not null, ref: > users.id]
